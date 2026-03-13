@@ -43,7 +43,8 @@ export async function runCrawler({ seedUrls, target, minWords, concurrency, outD
 
             linkNumber++;
             store.write(`${linkNumber}.txt`, text);
-            indexLines.push(`${linkNumber}\t${url}`);
+            const prettyUrl = decodeURI(url);
+            indexLines.push(`${linkNumber}\t${prettyUrl}`);
 
             console.log(`${linkNumber}: ${url} (${wc} слов)`);
         }

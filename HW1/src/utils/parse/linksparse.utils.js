@@ -1,9 +1,26 @@
 import { JSDOM } from "jsdom";
 
-function normalize(u) {
-    const url = new URL(u);
-    url.hash = "";
-    return url.toString();
+function normalizeWikiLink(urlObj) {
+    urlObj.hash = "";
+
+    if (urlObj.pathname === "/w/index.php") {
+        const title = urlObj.searchParams.get("title");
+        if (!title) return null;
+
+        const wikiTitle = title.replace(/ /g, "_");
+        urlObj.pathname = `/wiki/${wikiTitle}`;
+    }
+
+    urlObj.search = "";
+
+    if (!urlObj.pathname.startsWith("/wiki/")) return null;
+
+    const titleDecoded = decodeURIComponent(urlObj.pathname.slice("/wiki/".length));
+    if (titleDecoded.startsWith("Special:") || titleDecoded.startsWith("Служебная:")) {
+        return null;
+    }
+
+    return urlObj.toString();
 }
 
 export function extractLinks(html, base) {
@@ -19,7 +36,9 @@ export function extractLinks(html, base) {
         if (href.startsWith("javascript:")) return;
 
         try {
-            out.push(normalize(new URL(href, base).toString()));
+            const abs = new URL(href, base);
+            const norm = normalizeWikiLink(abs);
+            if (norm) out.push(norm);
         } catch {}
     });
 
