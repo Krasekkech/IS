@@ -1,46 +1,49 @@
 import { JSDOM } from "jsdom";
 
-function normalizeWikiLink(urlObj) {
-    urlObj.hash = "";
 
-    if (urlObj.pathname === "/w/index.php") {
-        const title = urlObj.searchParams.get("title");
-        if (!title) return null;
-
-        const wikiTitle = title.replace(/ /g, "_");
-        urlObj.pathname = `/wiki/${wikiTitle}`;
-    }
-
-    urlObj.search = "";
-
-    if (!urlObj.pathname.startsWith("/wiki/")) return null;
-
-    const titleDecoded = decodeURIComponent(urlObj.pathname.slice("/wiki/".length));
-    if (titleDecoded.startsWith("Special:") || titleDecoded.startsWith("Служебная:")) {
-        return null;
-    }
-
-    return urlObj.toString();
+function normalize(u) {
+    const url = new URL(u);
+    url.hash = "";
+    return url.toString();
 }
 
 export function extractLinks(html, base) {
     const dom = new JSDOM(html, { url: base });
     const doc = dom.window.document;
-    const out = [];
+
+    const links = [];
+    const rejected = [];
 
     doc.querySelectorAll("a[href]").forEach((a) => {
         const href = a.getAttribute("href");
         if (!href) return;
-        if (href.startsWith("#")) return;
-        if (href.startsWith("mailto:")) return;
-        if (href.startsWith("javascript:")) return;
+
+        if (href.startsWith("#")) {
+            rejected.push(href);
+            return;
+        }
+
+        if (href.startsWith("mailto:")) {
+            rejected.push(href);
+            return;
+        }
+
+        if (href.startsWith("javascript:")) {
+            rejected.push(href);
+            return;
+        }
 
         try {
-            const abs = new URL(href, base);
-            const norm = normalizeWikiLink(abs);
-            if (norm) out.push(norm);
+            const fullUrl = new URL(href, base);
+
+            if (fullUrl.pathname === "/w/index.php") {
+                rejected.push(decodeURI(fullUrl.toString()));
+                return;
+            }
+
+            links.push(normalize(fullUrl.toString()));
         } catch {}
     });
 
-    return out;
+    return { links, rejected };
 }

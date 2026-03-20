@@ -12,6 +12,10 @@ export async function runCrawler({ seedUrls, target, minWords, concurrency, outD
     let linkNumber = 0;
     const indexLines = [];
 
+    const antiIndexLines = [];
+    const antiIndexSet = new Set();
+    const savedUrls = new Set();
+
     while (linkNumber < target && queue.length) {
         const batch = queue.splice(0, concurrency);
 
@@ -21,7 +25,17 @@ export async function runCrawler({ seedUrls, target, minWords, concurrency, outD
                     const res = await fetch(url);
                     const html = await res.text();
 
-                    for (const link of extractLinks(html, url)) {
+                    const { links, rejected } = extractLinks(html, url);
+
+                    for (const badLink of rejected) {
+                        const prettyBadLink = decodeURI(badLink).replace(/ /g, "_");
+                        if (!antiIndexSet.has(prettyBadLink)) {
+                            antiIndexSet.add(prettyBadLink);
+                            antiIndexLines.push(prettyBadLink);
+                        }
+                    }
+
+                    for (const link of links) {
                         if (!seen.has(link)) {
                             seen.add(link);
                             queue.push(link);
@@ -38,17 +52,27 @@ export async function runCrawler({ seedUrls, target, minWords, concurrency, outD
             if (linkNumber >= target) break;
 
             const wc = wordsCount(text);
-            if (wc < minWords) continue;
-            if (!russianLang(text)) continue;
+            const prettyUrl = decodeURI(url);
+
+            if (wc < minWords || !russianLang(text)) {
+                if (!antiIndexSet.has(prettyUrl)) {
+                    antiIndexSet.add(prettyUrl);
+                    antiIndexLines.push(prettyUrl);
+                }
+                continue;
+            }
+
+            if (savedUrls.has(prettyUrl)) continue;
+            savedUrls.add(prettyUrl);
 
             linkNumber++;
             store.write(`${linkNumber}.txt`, text);
-            const prettyUrl = decodeURI(url);
             indexLines.push(`${linkNumber}\t${prettyUrl}`);
 
-            console.log(`${linkNumber}: ${url} (${wc} слов)`);
+            console.log(`${linkNumber}: ${prettyUrl} (${wc} слов)`);
         }
     }
 
     store.write("index.txt", indexLines.join("\n") + "\n");
+    store.write("antiindex.txt", antiIndexLines.join("\n") + "\n");
 }

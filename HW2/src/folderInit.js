@@ -26,7 +26,7 @@ export async function folderInit(inDir, outDir) {
 
         const filtered = lemmas.filter((w) => w && !stopSet.has(w));
 
-        store.write(file, filtered.join(" "));
+        store.write(file, filtered.join("\n"));
         console.log(`${file} (токены=${tokens.length}, на выходе=${filtered.length})`);
     }
 
